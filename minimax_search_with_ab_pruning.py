@@ -22,7 +22,7 @@ class MinimaxAgent(object):
 
 	def max_value(self, board, alpha, beta, depth):
 		if depth >= self.max_depth:
-			return board.get_utility(color=1), None
+			return board.get_utility(), None
 		v = float("-inf")
 		for a in board.get_actions():
 			new_board = deepcopy(board)
@@ -39,7 +39,7 @@ class MinimaxAgent(object):
 
 	def min_value(self, board, alpha, beta, depth):
 		if depth >= self.max_depth:
-			return board.get_utility(color=1), None
+			return board.get_utility(), None
 		v = float("inf")
 		for a in board.get_actions():
 			new_board = deepcopy(board)
@@ -55,9 +55,9 @@ class MinimaxAgent(object):
 		return v, action
 
 	def alpha_beta_search(self):
-		tick = time.time()
+		# tick = time.time()
 		v, action = self.max_value(self.board, float("-inf"), float("inf"), depth=0)
-		tock = time.time()
+		# tock = time.time()
 		return action
 
 
@@ -83,13 +83,13 @@ SHAPE_SCORE = dict(
 	BLOCKED_ONE=1,
 	BLOCKED_TWO=10,
 	BLOCKED_THREE=100,
-	BLOCKED_FOUR=10000
+	BLOCKED_FOUR=20000
 )
 
 
 class Board(object):
 	def __init__(self, width=MAX_BOARD, height=MAX_BOARD):
-		self.board = [[0 for i in range(width)] for j in range(width)]
+		self.board = [[0 for i in range(height)] for j in range(width)]
 		self.last_player = None
 		self.chess1 = []
 		self.chess2 = []
@@ -132,10 +132,12 @@ class Board(object):
 			s += "{}\t".format(i) +"\t".join([str(j) for j in self.board[i]]) + "\n"
 		return s
 
-	def get_actions(self, count_limit=100):
+	def get_actions(self, count_limit=20):
 		fives = []
 		fours1 = []
 		fours2 = []
+		two_blocked_fours1 = []
+		two_blocked_fours2 = []
 		blocked_fours1 = []
 		blocked_fours2 = []
 		two_threes1 = []
@@ -149,15 +151,17 @@ class Board(object):
 		if self.last_player is None:
 			return [(pp.width // 2, pp.height // 2)]
 
+		last_x, last_y = self.chess1[-1] if self.last_player == 1 else self.chess2[-1]
 		for x in range(0, pp.width):
 			for y in range(0, pp.height):
 				if not self.is_free(x, y):
 					continue
 					
 				if len(self.chess1) + len(self.chess2) < 6:
-					if not (self._has_neighbor(x, y, 1, 1) or self._has_neighbor(x, y, 2, 2)):
+					if not self._has_neighbor(x, y, 1, 1):
 						continue
-
+				elif not self._has_neighbor(x, y, 2, 2):
+					continue
 				max_score = max(self.score1[x][y], self.score2[x][y])
 
 				if max_score >= SHAPE_SCORE["FIVE"]:
@@ -166,6 +170,10 @@ class Board(object):
 					fours2.append((x, y))
 				elif self.score1[x][y] >= SHAPE_SCORE["FOUR"]:
 					fours1.append((x, y))
+				elif self.score2[x][y] >= 2 * SHAPE_SCORE["BLOCKED_FOUR"]:
+					two_blocked_fours2.append((x, y))
+				elif self.score1[x][y] >= 2 * SHAPE_SCORE["BLOCKED_FOUR"]:
+					two_blocked_fours1.append((x, y))
 				elif self.score2[x][y] >= SHAPE_SCORE["BLOCKED_FOUR"]:
 					blocked_fours2.append((x, y))
 				elif self.score1[x][y] >= SHAPE_SCORE["BLOCKED_FOUR"]:
@@ -179,49 +187,64 @@ class Board(object):
 				elif self.score1[x][y] >= SHAPE_SCORE["THREE"]:
 					threes1.append((x, y))
 				elif self.score2[x][y] >= SHAPE_SCORE["TWO"]:
-					# twos2.append((x, y))
-					twos2 = [(x, y)] + twos2
+					twos2.append((x, y))
 				elif self.score1[x][y] >= SHAPE_SCORE["TWO"]:
-					# twos1.append((x, y))
-					twos1 = [(x, y)] + twos1
+					twos1.append((x, y))
 				else:
 					neighbors.append((x, y))
 		
 		if fives:
 			return fives
-		if self.last_player == 1 and fours2:
-			return fours2
-		if self.last_player == 2 and fours1:
-			return fours1
-		if self.last_player == 1 and fours1 and (not blocked_fours2):
-			return fours1
-		if self.last_player == 2 and fours2 and (not blocked_fours1):
-			return fours2
-		
-		fours = fours2 + fours1 if self.last_player == 1 else fours1 + fours2
-		if fours:
-			blocked_fours = blocked_fours2 + blocked_fours1 if self.last_player == 1 else blocked_fours1 + blocked_fours2
-			return fours + blocked_fours
+		if self.last_player == 1 and (fours2 or two_blocked_fours2):
+			return fours2 + two_blocked_fours2
+		if self.last_player == 2 and (fours1 or two_blocked_fours1):
+			return fours1 + two_blocked_fours1
+		if self.last_player == 1 and (fours1 or two_blocked_fours1):
+			if two_blocked_fours2:
+				return fours1 + two_blocked_fours2 + two_blocked_fours1 + blocked_fours2 + blocked_fours1
+			if blocked_fours2:
+				return fours1 + blocked_fours2 + blocked_fours1
+			else:
+				return fours1
+		if self.last_player == 2 and (fours2 or two_blocked_fours2):
+			if two_blocked_fours1:
+				return fours2 + two_blocked_fours1 + two_blocked_fours2 + blocked_fours1 + blocked_fours2
+			if blocked_fours1:
+				return fours2 + blocked_fours1 + blocked_fours2
+			else:
+				return fours2
+
 		
 		if self.last_player == 1:
 			result = two_threes2 + two_threes1 + blocked_fours2 + blocked_fours1 + threes2 + threes1
 		if self.last_player == 2:
 			result = two_threes1 + two_threes2 + blocked_fours1 + blocked_fours2 + threes1 + threes2
-		result.sort(key=lambda x:-max(self.score1[x[0]][x[1]], self.score2[x[0]][x[1]]))
+		# result.sort(key=lambda x:-max(self.score1[x[0]][x[1]], self.score2[x[0]][x[1]]))
 		if two_threes2 or two_threes1:
-			return result
+			return result[:count_limit]
+
+		if len(self.chess1) + len(self.chess2) > 10 and len(result) > 0:
+			return result[:count_limit]
 
 		twos = twos2 + twos1 if self.last_player == 1 else twos1 + twos2
-		twos.sort(key=lambda x:-max(self.score1[x[0]][x[1]], self.score2[x[0]][x[1]]))
-
-		result = result + twos if twos else result + neighbors
-		return result[:count_limit]
+		if twos:
+			twos.sort(key=lambda x:-max(self.score1[x[0]][x[1]], self.score2[x[0]][x[1]]))
+			result = result + twos
+			return result[:count_limit]
+		else:
+			neighbors.sort(key=lambda x:-max(self.score1[x[0]][x[1]], self.score2[x[0]][x[1]]))
+			result = result + neighbors
+			return result[:count_limit]
 
 	def update_point(self, x, y, color):
-		result, radius = 0, 8
-		count, block, second_count, empty = 1, 0, 0, -1
+		opponent_color = 2 if color == 1 else 1
+		result, radius = 0, 15
+
+		# count: how many chess of your color
+		# block: {0, 1, 2}
+		count, block, empty = 1, 0, -1
 		for j in range(y + 1, y + radius + 1):
-			if j >= pp.height:
+			if j >= pp.height or self.board[x][j] == opponent_color:
 				block += 1
 				break
 			if self.board[x][j] == 0:
@@ -232,12 +255,9 @@ class Board(object):
 					break
 			if self.board[x][j] == color:
 				count += 1
-				continue
-			else:
-				block += 1
-				break
+
 		for j in range(y - 1, y - radius - 1, -1):
-			if j < 0:
+			if j < 0 or self.board[x][j] == opponent_color:
 				block += 1
 				break
 			if self.board[x][j] == 0:
@@ -247,19 +267,15 @@ class Board(object):
 				else:
 					break
 			if self.board[x][j] == color:
-				second_count += 1
+				count += 1
 				if empty != -1:
-					empty + 1
-				continue
-			else:
-				block += 1
-				break
-		count += second_count
+					empty += 1
+
 		result += self._count_to_score(count, block, empty)
 
-		count, block, second_count, empty = 1, 0, 0, -1
+		count, block, empty = 1, 0, -1
 		for i in range(x + 1, x + radius + 1):
-			if i >= pp.width:
+			if i >= pp.width or self.board[i][y] == opponent_color:
 				block += 1
 				break
 			if self.board[i][y] == 0:
@@ -270,12 +286,8 @@ class Board(object):
 					break
 			if self.board[i][y] == color:
 				count += 1
-				continue
-			else:
-				block += 1
-				break
 		for i in range(x - 1, x - radius - 1, -1):
-			if i < 0:
+			if i < 0 or self.board[i][y] == opponent_color:
 				block += 1
 				break
 			if self.board[i][y] == 0:
@@ -285,19 +297,15 @@ class Board(object):
 				else:
 					break
 			if self.board[i][y] == color:
-				second_count += 1
+				count += 1
 				if empty != -1:
-					empty + 1
-				continue
-			else:
-				block += 1
-				break
-		count += second_count
+					empty += 1
+
 		result += self._count_to_score(count, block, empty)
 
-		count, block, second_count, empty = 1, 0, 0, -1
+		count, block, empty = 1, 0, -1
 		for i in range(1, radius + 1):
-			if x + i >= pp.width or y + i >= pp.height:
+			if x + i >= pp.width or y + i >= pp.height or self.board[x + i][y + i] == opponent_color:
 				block += 1
 				break
 			if self.board[x + i][y + i] == 0:
@@ -308,12 +316,8 @@ class Board(object):
 					break
 			if self.board[x + i][y + i] == color:
 				count += 1
-				continue
-			else:
-				block += 1
-				break
 		for i in range(1, radius + 1):
-			if x - i < 0 or y - i < 0:
+			if x - i < 0 or y - i < 0 or self.board[x - i][y - i] == opponent_color:
 				block += 1
 				break
 			if self.board[x - i][y - i] == 0:
@@ -323,19 +327,15 @@ class Board(object):
 				else:
 					break
 			if self.board[x - i][y - i] == color:
-				second_count += 1
+				count += 1
 				if empty != -1:
-					empty + 1
-				continue
-			else:
-				block += 1
-				break
-		count += second_count
+					empty += 1
+
 		result += self._count_to_score(count, block, empty)
 
-		count, block, second_count, empty = 1, 0, 0, -1
+		count, block, empty = 1, 0, -1
 		for i in range(1, radius + 1):
-			if x + i >= pp.width or y - i < 0:
+			if x + i >= pp.width or y - i < 0 or self.board[x + i][y - i] == opponent_color:
 				block += 1
 				break
 			if self.board[x + i][y - i] == 0:
@@ -346,12 +346,8 @@ class Board(object):
 					break
 			if self.board[x + i][y - i] == color:
 				count += 1
-				continue
-			else:
-				block += 1
-				break
 		for i in range(1, radius + 1):
-			if x - i < 0 or y + i >= pp.height:
+			if x - i < 0 or y + i >= pp.height or self.board[x - i][y + i] == opponent_color:
 				block += 1
 				break
 			if self.board[x - i][y + i] == 0:
@@ -361,19 +357,16 @@ class Board(object):
 				else:
 					break
 			if self.board[x - i][y + i] == color:
-				second_count += 1
+				count += 1
 				if empty != -1:
-					empty + 1
-				continue
-			else:
-				block += 1
-				break
-		count += second_count
+					empty += 1
+
 		result += self._count_to_score(count, block, empty)
 
 		return result
 
 	def update_score(self, x, y, color):
+		# logDebug("updating score step {}".format(len(self.chess1) + len(self.chess2)))
 		radius = 4
 
 		def update(x, y):
@@ -409,26 +402,19 @@ class Board(object):
 			update(x + i, y + i)
 		
 		for i in range(-radius, radius + 1):
-			if x + i < 0 or y - i < 0:
+			if x + i < 0 or y - i >= pp.width:
 				continue
-			if x + i >= pp.width or y - i >= pp.width:
-				continue
+			if x + i >= pp.width or y - i < 0:
+				break
 			update(x + i, y - i)
 
-
-	def get_utility(self, color):
-		chess1_score = 0
-		chess2_score = 0
+	def get_utility(self):
+		score = 0
 		for chess in self.chess1:
-			chess1_score += self.score1[chess[0]][chess[1]]
+			score += self.score1[chess[0]][chess[1]]
 		for chess in self.chess2:
-			chess2_score += self.score2[chess[0]][chess[1]]
-		if color == 1:
-			return chess1_score - chess2_score
-		elif color == 2:
-			return chess2_score - chess1_score
-		else:
-			raise RuntimeError("Unknown color {} in get utility!".format(color))
+			score -= self.score2[chess[0]][chess[1]]
+		return score
 
 	def _has_neighbor(self, x, y, distance, count):
 		for i in range(x - distance, x + distance + 1):
@@ -446,147 +432,123 @@ class Board(object):
 	def _count_to_score(self, count, block, empty):
 		if empty <= 0:
 			if count >= 5:
-				return SHAPE_SCORE["FIVE"]
+				return SHAPE_SCORE["FIVE"]  # X X X X X
 			if block == 0:
 				if count == 1:
-					return SHAPE_SCORE["ONE"]
+					return SHAPE_SCORE["ONE"]  # O X O
 				elif count == 2:
-					return SHAPE_SCORE["TWO"]
+					return SHAPE_SCORE["TWO"]  # O X X O
 				elif count == 3:
-					return SHAPE_SCORE["THREE"]
+					return SHAPE_SCORE["THREE"]  # O X X X O
 				elif count == 4:
-					return SHAPE_SCORE["FOUR"]
-
+					return SHAPE_SCORE["FOUR"]  # O X X X X O
 			if block == 1:
 				if count == 1:
-					return SHAPE_SCORE["BLOCKED_ONE"]
+					return SHAPE_SCORE["BLOCKED_ONE"]  # - X O
 				elif count == 2:
-					return SHAPE_SCORE["BLOCKED_TWO"]
+					return SHAPE_SCORE["BLOCKED_TWO"]  # - X X O
 				elif count == 3:
-					return SHAPE_SCORE["BLOCKED_THREE"]
+					return SHAPE_SCORE["BLOCKED_THREE"]  # - X X X O
 				elif count == 4:
-					return SHAPE_SCORE["BLOCKED_FOUR"]
+					return SHAPE_SCORE["BLOCKED_FOUR"]  # - X X X X O
 		elif empty == 1 or empty == count - 1:
 			if count >= 6:
-				return SHAPE_SCORE["FIVE"]
+				return SHAPE_SCORE["FIVE"]  # X O X X X X X
 			if block == 0:
 				if count == 2:
-					return SHAPE_SCORE["TWO"] / 2
+					return SHAPE_SCORE["TWO"] / 2  # O X O X O
 				if count == 3:
 					return SHAPE_SCORE["THREE"]
+					# return SHAPE_SCORE["THREE"] + SHAPE_SCORE['BLOCKED_ONE']  # O X O X X O
 				if count == 4:
 					return SHAPE_SCORE["BLOCKED_FOUR"]
+					# return SHAPE_SCORE["BLOCKED_FOUR"] + SHAPE_SCORE['BLOCKED_ONE']  # O X O X X X O
 				if count == 5:
-					return SHAPE_SCORE["FOUR"]
-			
+					return SHAPE_SCORE["FOUR"]  # O X O X X X X O
 			if block == 1:
 				if count == 2:
-					return SHAPE_SCORE["BLOCKED_TWO"]
+					return SHAPE_SCORE["BLOCKED_TWO"]  # - X O X O
 				if count == 3:
-					return SHAPE_SCORE["BLOCKED_THREE"]
+					return SHAPE_SCORE["BLOCKED_THREE"]  # - X O X X O / - X X O X O
 				if count == 4:
-					return SHAPE_SCORE["BLOCKED_FOUR"]
+					return SHAPE_SCORE["BLOCKED_FOUR"]  # - X O X X X O / - X X X O X O
 				if count == 5:
-					return SHAPE_SCORE["BLOCKED_FOUR"]
+					return SHAPE_SCORE["BLOCKED_FOUR"]  # - X O X X X X O / - X X X X O X
 
 		elif empty == 2 or empty == count - 2:
 			if count >= 7:
-				return SHAPE_SCORE["FIVE"]
+				return SHAPE_SCORE["FIVE"]  # X X O X X X X X
 			if block == 0:
 				if count == 3:
-					return SHAPE_SCORE["THREE"]
+					return SHAPE_SCORE["THREE"]  # O X X O X O
 				if count == 4:
-					return SHAPE_SCORE["BLOCKED_FOUR"]
+					return SHAPE_SCORE["BLOCKED_FOUR"]  # O X X O X X O
 				if count == 5:
-					return SHAPE_SCORE["BLOCKED_FOUR"]
+					return SHAPE_SCORE["BLOCKED_FOUR"]  # O X X O X X X O
 				if count == 6:
-					return SHAPE_SCORE["FOUR"]
+					return SHAPE_SCORE["FOUR"]  # O X X O X X X X O
 			
 			if block == 1:
-				if count == 2:
-					return SHAPE_SCORE["BLOCKED_THREE"]
 				if count == 3:
-					return SHAPE_SCORE["BLOCKED_FOUR"]
+					return SHAPE_SCORE["BLOCKED_THREE"]  # - X X O X O
 				if count == 4:
-					return SHAPE_SCORE["BLOCKED_FOUR"]
+					return SHAPE_SCORE["BLOCKED_FOUR"]  # - X X O X X O
 				if count == 5:
-					return SHAPE_SCORE["FOUR"]
+					return SHAPE_SCORE["BLOCKED_FOUR"]  # - X X O X X X O / - X X X O X X
+				if count == 6:
+					return SHAPE_SCORE["FOUR"]  # - X X O X X X X O / - X X X X O X X O
 
 			if block == 2:
-				if count == 4:
-					return SHAPE_SCORE["BLOCKED_FOUR"]
-				if count == 5:
-					return SHAPE_SCORE["BLOCKED_FOUR"]
-				if count == 6:
-					return SHAPE_SCORE["BLOCKED_FOUR"]
+				return SHAPE_SCORE["BLOCKED_FOUR"] # - X X O X X - / # - X X O X X X - / # - X X O X X X X -
 
 		elif empty == 3 or empty == count - 3:
 			if count >= 8:
-				return SHAPE_SCORE["FIVE"]
+				return SHAPE_SCORE["FIVE"]  # X X X O X X X X X
 			if block == 0:
 				if count == 4:
-					return SHAPE_SCORE["THREE"] / 2
+					return SHAPE_SCORE["THREE"]
+					# return SHAPE_SCORE["THREE"] + SHAPE_SCORE["BLOCKED_ONE"]  # O X X X O X O
 				if count == 5:
 					return SHAPE_SCORE["THREE"]
+					# return SHAPE_SCORE["THREE"] + SHAPE_SCORE["BLOCKED_TWO"]  # O X X X O X X O
 				if count == 6:
 					return SHAPE_SCORE["BLOCKED_FOUR"]
+					# return SHAPE_SCORE["BLOCKED_FOUR"] + SHAPE_SCORE["BLOCKED_THREE"]  # O X X X O X X X O
 				if count == 7:
 					return SHAPE_SCORE["FOUR"]
+					# return SHAPE_SCORE["FOUR"] + SHAPE_SCORE["BLOCKED_THREE"]  # O X X X O X X X X O
 			
 			if block == 1:
 				if count == 4:
-					return SHAPE_SCORE["BLOCKED_FOUR"]
+					return SHAPE_SCORE["BLOCKED_FOUR"]  # - X X X O X O 
 				if count == 5:
-					return SHAPE_SCORE["BLOCKED_FOUR"]
+					return SHAPE_SCORE["BLOCKED_FOUR"]  # - X X X O X X O 
 				if count == 6:
-					return SHAPE_SCORE["BLOCKED_FOUR"]
+					return SHAPE_SCORE["BLOCKED_FOUR"]  # - X X X O X X X O 
 				if count == 7:
-					return SHAPE_SCORE["FOUR"]
+					return SHAPE_SCORE["FOUR"]  # - X X X O X X X X O 
 
 			if block == 2:
-				if count == 4:
-					return SHAPE_SCORE["BLOCKED_FOUR"]
-				if count == 5:
-					return SHAPE_SCORE["BLOCKED_FOUR"]
-				if count == 6:
-					return SHAPE_SCORE["BLOCKED_FOUR"]
-				if count == 7:
-					return SHAPE_SCORE["BLOCKED_FOUR"]
+				return SHAPE_SCORE["BLOCKED_FOUR"]
 
 		elif empty == 4 or empty == count - 4:
 			if count >= 9:
-				return SHAPE_SCORE["FIVE"]
+				return SHAPE_SCORE["FIVE"]  # X X X X O X X X X X 
 			if block == 0:
-				if count == 5:
-					return SHAPE_SCORE["FOUR"] / 2
-				if count == 6:
-					return SHAPE_SCORE["FOUR"]
-				if count == 7:
-					return SHAPE_SCORE["FOUR"]
-				if count == 8:
-					return SHAPE_SCORE["FOUR"]
+				return SHAPE_SCORE["FOUR"]  # O X X X X O X O / O X X X X O X X O / O X X X X O X X X O / O X X X X O X X X X X O
 			
 			if block == 1:
-				if count == 4:
-					return SHAPE_SCORE["BLOCKED_FOUR"]
 				if count == 5:
-					return SHAPE_SCORE["BLOCKED_FOUR"]
+					return SHAPE_SCORE["BLOCKED_FOUR"]  # - X X X X O X O / - X O X X X X O
 				if count == 6:
-					return SHAPE_SCORE["BLOCKED_FOUR"]
+					return SHAPE_SCORE["BLOCKED_FOUR"]  # - X X X X O X X O / - X X O X X X X O
 				if count == 7:
-					return SHAPE_SCORE["BLOCKED_FOUR"]
+					return SHAPE_SCORE["BLOCKED_FOUR"]  # - X X X X O X X X O / - X X X O X X X X O
 				if count == 8:
-					return SHAPE_SCORE["FOUR"]
+					return SHAPE_SCORE["FOUR"]  # - X X X X O X X X O / - X X X O X X X X O 
 
 			if block == 2:
-				if count == 5:
-					return SHAPE_SCORE["BLOCKED_FOUR"]
-				if count == 6:
-					return SHAPE_SCORE["BLOCKED_FOUR"]
-				if count == 7:
-					return SHAPE_SCORE["BLOCKED_FOUR"]
-				if count == 8:
-					return SHAPE_SCORE["BLOCKED_FOUR"]
+				return SHAPE_SCORE["BLOCKED_FOUR"]
 
 		elif empty == 5 or empty == count - 5:
 			return SHAPE_SCORE["FIVE"]
@@ -607,6 +569,7 @@ def brain_init():
 	pp.pipeOut("OK")
 
 def brain_restart():
+	del board
 	board = Board(pp.width, pp.height)
 	for i in range(pp.width):
 		for j in range(pp.height):
@@ -645,10 +608,10 @@ def brain_turn():
 			return
 		i = 0
 		while True:
-			tick = time.time()
-			agent = MinimaxAgent(board, max_depth=3)
+			# tick = time.time()
+			agent = MinimaxAgent(board)
 			x, y = agent.alpha_beta_search()
-			logDebug("{} nodes visited in {:.3f}s".format(agent.node_count, time.time() - tick))
+			# logDebug("{} nodes visited in {:.3f}s".format(agent.node_count, time.time() - tick))
 			i += 1
 			if pp.terminateAI:
 				return
@@ -704,16 +667,6 @@ def logTraceBack():
 		f.flush()
 	raise
 
-# # use logDebug wherever
-# # use try-except (with logTraceBack in except branch) to get exception info
-# # an example of problematic function
-# def brain_turn():
-# 	logDebug("some message 1")
-# 	try:
-# 		logDebug("some message 2")
-# 		logDebug("some message 3") # not logged, as it is after error
-# 	except:
-# 		logTraceBack()
 
 ######################################################################
 
