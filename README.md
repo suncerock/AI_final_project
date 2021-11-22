@@ -3,8 +3,6 @@ Final project for DATA130008 21fall
 
 All-the-time open source, welcome forking, please keep the author information ^ ^
 
-## 2021/11/11: support minimax search with alpha-beta pruning
-To generate .exe file, run
-```
-pyinstaller minimax.py pisqpipe.py --name pbrain-suncerock.exe --onefile
+## 2021/11/11: Checkpoint 1
+Files are out of order, so they are just put in [one directory](https://github.com/suncerock/AI_final_project/tree/main/checkpoint1) lol 
 ```
