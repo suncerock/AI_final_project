@@ -9,7 +9,7 @@ The utility function and the get action function
 
 import time
 
-from gomoku import GomokuState
+from gomoku import *
 from mcts import *
 import pisqpipe as pp
 from pisqpipe import DEBUG_EVAL, DEBUG
@@ -21,73 +21,6 @@ pp.infotext = \
 	"""
 
 MAX_BOARD = 50
-board = GomokuState(20, 20)
-def brain_init():
-	# global board
-	board = GomokuState(pp.width, pp.height)
-	if pp.width < 5 or pp.height < 5:
-		pp.pipeOut("ERROR size of the board")
-		return
-	if pp.width > MAX_BOARD or pp.height > MAX_BOARD:
-		pp.pipeOut("ERROR Maximal board size is {}".format(MAX_BOARD))
-		return
-	pp.pipeOut("OK")
-
-def brain_restart():
-	del board
-	board = GomokuState(pp.width, pp.height)
-	for i in range(pp.width):
-		for j in range(pp.height):
-			board.board[i][j] = 0
-	pp.pipeOut("OK")
-
-def brain_my(x, y):
-	try:
-		logDebug("Moving {}, {}".format(x, y))
-		board = board.make_move((x, y))
-		logDebug("Moved {}, {}".format(x, y))
-	except:
-		pp.pipeOut("ERROR my move [{},{}]".format(x, y))
-
-def brain_opponents(x, y):
-	try:
-		board = board.make_move((x, y))
-	except:
-		pp.pipeOut("ERROR opponents's move [{},{}]".format(x, y))
-
-def brain_block(x, y):
-	try:
-		board.make_move((x, y))
-	except:
-		pp.pipeOut("ERROR winning move [{},{}]".format(x, y))
-
-def brain_takeback(x, y):
-	try:
-		board.takeback((x, y))
-		return 0
-	except:
-		return 2
-
-#################### only need to modify brain turn here #####################
-def brain_turn():
-	try:
-		if pp.terminateAI:
-			return
-
-		root = MCTSNode(board)
-		x, y = mcts(root)
-
-		if pp.terminateAI:
-			return
-
-		pp.do_mymove(x, y)
-	except:
-		logTraceBack()
-
-def brain_end():
-	pass
-
-#################### only need to modify brain end here ######################
 
 def brain_about():
 	pp.pipeOut(pp.infotext)
@@ -130,16 +63,95 @@ def logTraceBack():
 
 
 ######################################################################
+class GameController():
+	def __init__(self):
+		self.root = None
+
+	def move_or_create(self, x, y):
+		if (x, y) in self.root.children:
+			self.root = self.root.children[(x, y)]
+			self.root.parent = None
+		else:
+			self.root = AlphaNode(self.root.state.make_move((x, y), inplace=True))
+
+	def brain_init(self):
+		self.board = OnlyNeighborGomokuState(pp.width, pp.height)
+		self.root = AlphaNode(self.board, p=1)
+		if pp.width < 5 or pp.height < 5:
+			pp.pipeOut("ERROR size of the board")
+			return
+		if pp.width > MAX_BOARD or pp.height > MAX_BOARD:
+			pp.pipeOut("ERROR Maximal board size is {}".format(MAX_BOARD))
+			return
+		pp.pipeOut("OK")
+
+	def brain_restart(self):
+		del self.board
+		del self.root
+		self.board = OnlyNeighborGomokuState(pp.width, pp.height)
+		self.root = AlphaNode(self.board)
+		pp.pipeOut("OK")
+
+	def brain_my(self, x, y):
+		try:
+			logDebug("Moving {}, {}".format(x, y))
+			self.move_or_create(x, y)
+			logDebug("Moved {}, {}".format(x, y))
+		except:
+			logTraceBack()
+			pp.pipeOut("ERROR my move [{},{}]".format(x, y))
+
+	def brain_opponents(self, x, y):
+		try:
+			self.move_or_create(x, y)
+		except:
+			logTraceBack()
+			pp.pipeOut("ERROR opponents's move [{},{}]".format(x, y))
+
+	def brain_block(self, x, y):
+		try:
+			self.move_or_create(x, y)
+		except:
+			pp.pipeOut("ERROR winning move [{},{}]".format(x, y))
+
+	def brain_takeback(self, x, y):
+		try:
+			self.move_or_create(x, y)
+			return 0
+		except:
+			return 2
+
+	def brain_turn(self):
+		try:
+			if pp.terminateAI:
+				return
+
+			(x, y), _ = mcts(self.root, 2200)
+
+			if pp.terminateAI:
+				return
+
+			pp.do_mymove(x, y)
+		except:
+			logTraceBack()
+
+	def brain_end(self):
+		pass
+		
+#################################################################
+
+controller = GameController()
 
 # "overwrites" functions in pisqpipe module
-pp.brain_init = brain_init
-pp.brain_restart = brain_restart
-pp.brain_my = brain_my
-pp.brain_opponents = brain_opponents
-pp.brain_block = brain_block
-pp.brain_takeback = brain_takeback
-pp.brain_turn = brain_turn
-pp.brain_end = brain_end
+
+pp.brain_init = controller.brain_init
+pp.brain_restart = controller.brain_restart
+pp.brain_my = controller.brain_my
+pp.brain_opponents = controller.brain_opponents
+pp.brain_block = controller.brain_block
+pp.brain_takeback = controller.brain_takeback
+pp.brain_turn = controller.brain_turn
+pp.brain_end = controller.brain_end
 pp.brain_about = brain_about
 if DEBUG_EVAL:
 	pp.brain_eval = brain_eval

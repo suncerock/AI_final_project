@@ -129,6 +129,11 @@ if __name__ == '__main__':
 	initial_board_state = TicTacToeGameState(state = state, next_player=1)
 
 	from mcts import *
-	root = MCTSNode(initial_board_state)
-	best_node = mcts(root, 10000)
-	print(best_node.state.board)
+	best_node = MCTSNode(initial_board_state)
+
+	for _ in range(36):
+		best_node = mcts(best_node, 5000)
+		print(best_node.state.board)
+		if best_node.state.is_game_over():
+			print("Winner: ", best_node.state.game_result)
+			break
