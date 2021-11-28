@@ -42,10 +42,10 @@ if DEBUG_EVAL:
 ######################################################################
 
 # define a file for logging ...
-DEBUG_LOGFILE = "E:/AI_final_project/log.txt"
-# ...and clear it initially
-with open(DEBUG_LOGFILE,"w") as f:
-	pass
+# DEBUG_LOGFILE = "D:/丁毅威个人数据/大四上/人工智能/piskvork/log.txt"
+# # ...and clear it initially
+# with open(DEBUG_LOGFILE,"w") as f:
+# 	pass
 
 # define a function for writing messages to the file
 def logDebug(msg):
@@ -72,11 +72,11 @@ class GameController():
 			self.root = self.root.children[(x, y)]
 			self.root.parent = None
 		else:
-			self.root = AlphaNode(self.root.state.make_move((x, y), inplace=True))
+			self.root = MCTSNode(self.root.state.make_move((x, y), inplace=False))
 
 	def brain_init(self):
-		self.board = OnlyNeighborGomokuState(pp.width, pp.height)
-		self.root = AlphaNode(self.board, p=1)
+		self.board = ScoreGomokuState(pp.width, pp.height)
+		self.root = MCTSNode(self.board, p=1.0)
 		if pp.width < 5 or pp.height < 5:
 			pp.pipeOut("ERROR size of the board")
 			return
@@ -88,17 +88,14 @@ class GameController():
 	def brain_restart(self):
 		del self.board
 		del self.root
-		self.board = OnlyNeighborGomokuState(pp.width, pp.height)
-		self.root = AlphaNode(self.board)
+		self.board = ScoreGomokuState(pp.width, pp.height)
+		self.root = MCTSNode(self.board, p=1.0)
 		pp.pipeOut("OK")
 
 	def brain_my(self, x, y):
 		try:
-			logDebug("Moving {}, {}".format(x, y))
 			self.move_or_create(x, y)
-			logDebug("Moved {}, {}".format(x, y))
 		except:
-			logTraceBack()
 			pp.pipeOut("ERROR my move [{},{}]".format(x, y))
 
 	def brain_opponents(self, x, y):
@@ -126,7 +123,7 @@ class GameController():
 			if pp.terminateAI:
 				return
 
-			(x, y), _ = mcts(self.root, 2200)
+			(x, y), _ = mcts(self.root, 150)
 
 			if pp.terminateAI:
 				return
