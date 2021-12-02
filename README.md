@@ -15,5 +15,7 @@ Final Elo Rating: 1096
 ## Local Results
 All the experiments are done with the time tested on a Intel(R) Core(TM) i5-9400 CPU @ 2.90GHz CPU. Our own agents are tested against the six agents: MUSHROOM11, FIVEROW08, VALKYRIE13, PUREROCKY16, PISQ04 and NOESIS04.
 
-|---|---|---|---|---|---|---|
-| MUSHROOM11 | FIVEROW08 | VALKYRIE13 | PUREROCKY16 | PISQ04 | NOESIS04 | time (ms)|
+| ----- | -----------|-----------|------------|-------------|--------|----------|----------|
+| AGENT | MUSHROOM11 | FIVEROW08 | VALKYRIE13 | PUREROCKY16 | PISQ04 | NOESIS04 | time (ms)|
+| CKPT1 | 6:0        | 6:0       | 5:1        | 4:2         | 1:5    | 1:5      | ?        |
+| CKPT2 | 6:0        | 5:1       | 4:2        | 4:2         | 0:6    | 0:6      | 477      |
