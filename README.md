@@ -3,7 +3,7 @@ Final project for DATA130008 21fall
 
 Implementation of some algorithms covered in the course are also provided
 
-All-the-time open source, welcome forking, please keep the author information ^ ^
+2023/01/21: The repo is no longer under maintainance, but you might still contact the author about the work.
 
 ## Checkpoint 1: Minimax Search with Alpha Beta Pruning
 Final Elo Rating: 1185
